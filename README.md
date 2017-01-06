@@ -7,7 +7,7 @@
 val sessionCounter: Accumulator[Long] = sc.accumulator[Long](0L)
 val sessionTimeAccumulator: Accumulator[Long] = sc.accumulator[Long](0L)
 ```
-###2. Define Case class for request infor and Session infor encapsulation
+###2. Define Case class for request info and Session info encapsulation
 ```scala
 case class ActionInfo(clientIP:String, timestamp:String, requestURL:String, var sessionFlag: Int) extends Serializable
 case class SessionInfo(sessionID:String, sessionTime:Long, uniqURLCount:Int,startTime: DateTime,endTime: DateTime) extends Serializable
