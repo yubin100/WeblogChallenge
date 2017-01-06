@@ -119,9 +119,11 @@ val sessionInfoRDD: RDD[SessionInfo] = ip2SessionizedActionRDD.map(tuple => {
 ```
 
 ###5. Calculate average session time
-total session time divided by total session count
+* Total session time divided by total session count
+* Broadcast average session time for better performance
 ```scala
 val avgSessionTime: Long = sessionTimeAccumulator.value/sessionCounter.value
+val avgSessionTimeBroadcast = sc.broadcast(avgSessionTime)
 ```
 
 ###6.Print analyzed output to console
