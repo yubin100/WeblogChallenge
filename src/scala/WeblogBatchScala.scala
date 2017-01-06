@@ -93,7 +93,7 @@ object WeblogBatchScala {
     evaluate(sessionInfoRDD)
 
     //Calculate average session time: total session time divided by total session count
-    val avgSessionTime: Long = sessionTimeAccumulator.value/sessionCounter.value
+    val avgSessionTime: Long = if(sessionTimeAccumulator.value/sessionCounter.value == 0L) 1L else sessionTimeAccumulator.value/sessionCounter.value
 
     //Broadcast average session time for better performance
     val avgSessionTimeBroadcast = sc.broadcast(avgSessionTime)
@@ -104,52 +104,50 @@ object WeblogBatchScala {
     //Print to console: session detail info: clientIP, session time, start time, end time, unique URL visits
     sessionInfoRDD.foreachPartition(iterator => {
       iterator.foreach(session => {
-        println("User: " + session.sessionID.split("_")(0)
-          + " started a " + session.sessionTime + " seconds session from "
-          + session.startTime + " to " + session.endTime + " with " + session.uniqURLCount + " unique URL visits")
+        println("User: " + session.sessionID.split("_")(0) + " | "
+          + "SessionTime(in Seconds): " + session.sessionTime + " | "
+          + "StartTime: " + session.startTime + " | "
+          + "EndTime:" + session.endTime + " | "
+          + "Unique URL visits: " + session.uniqURLCount)
       })
     })
 
     //Print to console: average session time and the most engaged user IP and its session info
     sessionInfoRDD.take(1).foreach(session =>
-      println("Average Session time is: " + avgSessionTimeBroadcast.value + " seconds! \n "
-        + "The most engaged user is:"  + session.sessionID.split("_")(0)
-        + " who started a " + session.sessionTime + " seconds session from "
-        + session.startTime + " to " + session.endTime + " with " + session.uniqURLCount + " unique URL visits")
+      println("Average Session time in seconds: " + avgSessionTimeBroadcast.value + "  \n "
+        + "The most engaged user:"  + session.sessionID.split("_")(0) + " | "
+        + "SessionTime(in Seconds): " + session.sessionTime + " | "
+        + "StartTime: " + session.startTime + " | "
+        + "EndTime:" + session.endTime + " | "
+        + "Unique URL visits: " + session.uniqURLCount)
     )
 
     sc.stop()
   }
 
   //Parse input RDD to ActionInfo object for easy analysis
+  //Initialize sessionFlag to be 0
+  //clientIP:String, timestamp:String, requestURL:String, var sessionFlag: Int
   def parseAction(action:String) = ActionInfo(action.split(" ")(2).split(":")(0),action.split(" ")(0),action.split(" ")(12),0)
 
   //Calculate sessionFlag for each request from the same clientIP.
   //If time difference between two adjacent requests is longer than 15 Mins
   //Then the second request is treated as a start of a new session and sessionFlag plus one
-  def sessionize(lines: Seq[ActionInfo]) = {
-    if(lines.size < 2) {
-      lines
-    } else {
-      val sorted = lines.sortBy(_.timestamp)
-      sorted.tail.scanLeft(sorted.head) { case (prev, curr) =>
-        // Gets the correct session session
-        curr.sessionFlag = if (sessionTimedOut) prev.sessionFlag + 1 else prev.sessionFlag.toInt
-        // Returns true if the session has timed out between the prev and cur LogLine
-        def sessionTimedOut = (DateTime.parse(prev.timestamp) to DateTime.parse(curr.timestamp)).millis >  Minutes(15).milliseconds
-
-        curr
+  def sessionize(actions: Seq[ActionInfo]) = {
+    if(actions.size < 2) actions else {
+      val sorted: Seq[ActionInfo] = actions.sortBy(_.timestamp)
+      sorted.tail.scanLeft(sorted.head) { case (prevAction, currAction) =>
+        // Returns true if the session has timed out between the prevAction and currAction
+        def sessionTimedOut = (DateTime.parse(prevAction.timestamp) to DateTime.parse(currAction.timestamp)).millis >  Minutes(15).milliseconds
+        // Set currAction sessionFlag
+        currAction.sessionFlag = if (sessionTimedOut) prevAction.sessionFlag + 1 else prevAction.sessionFlag
+        currAction
       }
     }
   }
 
   //Trigger the accumulator operation
-  def evaluate[T](rdd:RDD[T]) = {
-    rdd.sparkContext.runJob(rdd,(iter: Iterator[T]) => {
-      while(iter.hasNext) iter.next()
-    })
-  }
-
+  def evaluate[T](rdd:RDD[T]) = { rdd.sparkContext.runJob(rdd,(iter: Iterator[T]) =>  while(iter.hasNext) iter.next()) }
 }
 
 //Case class for request information encapsulation
