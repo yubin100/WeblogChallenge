@@ -25,16 +25,13 @@ If time difference between two adjacent requests is longer than 15 Mins
 Then the second request is treated as a start of a new session and sessionFlag plus one
 ```scala
 def sessionize(actions: Seq[ActionInfo]) = {
-    if(actions.size < 2) {
-      actions
-    } else {
-      val sorted = actions.sortBy(_.timestamp)
+    if(actions.size < 2) actions else {
+      val sorted: Seq[ActionInfo] = actions.sortBy(_.timestamp)
       sorted.tail.scanLeft(sorted.head) { case (prevAction, currAction) =>
-        // Returns true if the session has timed out between the prev and cur LogLine
+        // Returns true if the session has timed out between the prevAction and currAction
         def sessionTimedOut = (DateTime.parse(prevAction.timestamp) to DateTime.parse(currAction.timestamp)).millis >  Minutes(15).milliseconds
-        // Gets the correct session session
-        currAction.sessionFlag = if (sessionTimedOut) prevAction.sessionFlag + 1 else prevAction.sessionFlag.toInt
-
+        // Set currAction sessionFlag
+        currAction.sessionFlag = if (sessionTimedOut) prevAction.sessionFlag + 1 else prevAction.sessionFlag
         currAction
       }
     }
@@ -43,11 +40,7 @@ def sessionize(actions: Seq[ActionInfo]) = {
 
 ###3. evaluate: Evaluate RDD for its Accumulator side effect
 ```scala
-def evaluate[T](rdd:RDD[T]) = {
-    rdd.sparkContext.runJob(rdd,(iter: Iterator[T]) => {
-      while(iter.hasNext) iter.next()
-    })
-  }
+def evaluate[T](rdd:RDD[T]) = { rdd.sparkContext.runJob(rdd,(iter: Iterator[T]) =>  while(iter.hasNext) iter.next()) }
 ```
 
 ##Step Three: Process batch data
