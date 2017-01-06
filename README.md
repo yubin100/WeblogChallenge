@@ -45,40 +45,39 @@ def evaluate[T](rdd:RDD[T]) = { rdd.sparkContext.runJob(rdd,(iter: Iterator[T]) 
 
 ##Step Three: Process batch data
 ###1. Read input Weblog data from file and map to ActionInfo Object using parseAction function
-RDD[String] => RDD[ActionInfo]
+*  RDD[String] => RDD[ActionInfo]
 ```scala
 val actionRDD: RDD[String] = sc.textFile(file)
 val parsedActionRDD: RDD[ActionInfo] = actionRDD.map(parseAction)
 ```
 
 ###2. Group request by clientIP 
-RDD[ActionInfo] => RDD[(String, Iterable[ActionInfo])]
+*  RDD[ActionInfo] => RDD[(String, Iterable[ActionInfo])]
 ```scala
 val ip2ActionsRDD: RDD[(String, Iterable[ActionInfo])] = parsedActionRDD.groupBy(_.clientIP)
 ```
 
 ###3. Within each clientIP group , flag each request with a session group number
-RDD[(String, Iterable[ActionInfo])] => RDD[(String, ActionInfo)] with ActionInfo's sessionFlag set
+*  RDD[(String, Iterable[ActionInfo])] => RDD[(String, ActionInfo)] with ActionInfo's sessionFlag set
 ```scala
 val sessionizedActionRDD: RDD[(String, ActionInfo)] = ip2ActionsRDD.flatMapValues(iterable => sessionize(iterable.toSeq))
 ```
 
 ###4. Group the sessionized RDD by clientIP_sessionFlag
-Each clientIP could have multiple sessions, clientIP_sessionFlag uniquely identify a session
-RDD[(String, ActionInfo)] => RDD[(String, Iterable[(String, ActionInfo)])] with ActionInfo's sessionFlag set
+* Each clientIP could have multiple sessions, clientIP_sessionFlag uniquely identify a session
+* RDD[(String, ActionInfo)] => RDD[(String, Iterable[(String, ActionInfo)])] with ActionInfo's sessionFlag set
 ```scala
 val ip2SessionizedActionRDD: RDD[(String, Iterable[(String, ActionInfo)])] = sessionizedActionRDD.groupBy(tuple => tuple._1+"_"+tuple._2.sessionFlag.toString)
 ```
 
 ###5. For each grouped session, traverse each of its requests and get the min timestamp as session start time and max timestamp as session end time
-1. Add each request's URL to Set for deduplication. The size of the Set is the uniq URL count of the session
-2. Calculate the session time using start time and end time
-3. Increment sessionCounter by 1 for each processed session
-4. Increment sessionTimeAccumulator by each session time
-5. Output SessionInfo object with (sessionID, sessionTime, uniqURLCount,startTime,endTime)
-6. Sort the output SessionInfo by its sessionTime in desc order
-
-RDD[(String, Iterable[(String, ActionInfo)])] => RDD[SessionInfo]
+*  Add each request's URL to Set for deduplication. The size of the Set is the uniq URL count of the session
+*  Calculate the session time using start time and end time
+*  Increment sessionCounter by 1 for each processed session
+*  Increment sessionTimeAccumulator by each session time
+*  Output SessionInfo object with (sessionID, sessionTime, uniqURLCount,startTime,endTime)
+*  Sort the output SessionInfo by its sessionTime in desc order
+*  RDD[(String, Iterable[(String, ActionInfo)])] => RDD[SessionInfo]
 ```scala
 val sessionInfoRDD: RDD[SessionInfo] = ip2SessionizedActionRDD.map(tuple => {
       val sessionID = tuple._1
